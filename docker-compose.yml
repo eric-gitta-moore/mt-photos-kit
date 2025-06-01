@@ -1,0 +1,58 @@
+services:
+  mt-photos:
+    image: mtphotos/mt-photos:latest
+    container_name: mt-photos
+    ports:
+      - 8063:8063
+      - 6379:36379
+      - 5432:35432
+    volumes:
+      - ./mt-photos/config:/config
+      - ./mt-photos/upload:/upload
+      - ./photos:/photos
+    environment:
+      - TZ=Asia/Shanghai
+  
+  socat-redis:
+    image: alpine/socat
+    network_mode: service:mt-photos
+    command: TCP-LISTEN:36379,fork,reuseaddr TCP:localhost:26379
+    depends_on:
+      - mt-photos
+  
+  socat-psql:
+    image: alpine/socat
+    network_mode: service:mt-photos
+    command: TCP-LISTEN:35432,fork,reuseaddr TCP:localhost:5432
+    depends_on:
+      - mt-photos
+
+  insightface:
+    image: kqstone/mt-photos-insightface-unofficial:latest
+    container_name: mt-photos-insightface-unofficial
+    ports:
+      - 8066:8066
+    environment:
+      - API_AUTH_KEY=mt_photos_ai_extra
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  mt-photos-ai:
+    image: mtphotos/mt-photos-ai:cuda-latest
+    container_name: mt-photos-ai-cuda
+    ports:
+      - 8060:8060
+    environment:
+      - API_AUTH_KEY=mt_photos_ai_extra
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
